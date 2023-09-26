@@ -1,0 +1,158 @@
+---
+title: "Building intuition around probability distributions"
+author: "BRG"
+date: "2023-09-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r, message=F}
+set.seed(1999)
+library(tidyverse)
+```
+
+
+# Discrete distributions
+
+### Bernoulli distribution
+
+Outcome is 1 with probability $p$ and 0 with probability $1-p$.
+
+In R, to simulate Bernoulli variables, we use the binomial distribution functions
+with parameter size=1.
+
+```{r}
+# Simulate one random Bernoulli variable with probability 0.6
+rbinom(n = 1, size = 1, prob = 0.6)
+
+# Simulate 1000 random Bernoulli variables with probability 0.6
+bern_vars <- rbinom(n = 1000, size = 1, prob = 0.6)
+
+# How many of those were 1?
+table(bern_vars)
+
+# What was the mean response? The variance?
+# We expect: mean = 0.6, var = 0.6(1-0.6) = 0.24
+mean(bern_vars); var(bern_vars)
+
+```
+
+### Binomial distribution
+
+How many of $N$ trials are successful, if each trial is successful with probability $p$?
+
+
+```{r}
+# Simulate one random binomial variable with probability 0.6 and size 10
+rbinom(n = 1, size = 10, prob = 0.6)
+
+# Simulate 1000 random Bernoulli variables with probability 0.6 and size 10
+binom_vars <- rbinom(n = 1000, size = 10, prob = 0.6)
+
+# Look at the distribution, compared to the expected distribution.
+x <- 0:10
+expectation <- dbinom(x, size = 10, prob = 0.6)
+
+ggplot() +
+  geom_histogram(data=data.frame(var = binom_vars), aes(var)) +
+  geom_line(data = data.frame(x = x, expectation = expectation*1000),
+           aes(x, expectation), inherit.aes = FALSE) +
+  ggtitle("Histogram of binomial trials compared to expectation (line)")
+
+
+# What was the mean response? The variance?
+# We expect: mean = 0.6, var = 0.6(1-0.6) = 0.24
+mean(bern_vars); var(bern_vars)
+
+```
+
+### Poisson distribution
+
+The Poisson arises from a spatial point process.
+
+Consider a case where we have 100 individuals who are at any given time distributed randomly over a 10x10 area. If we put down a 1x1 quadrat and counted the number of individuals in one cell, the count that we get follows a Poisson distribution.
+
+
+To demonstrate this let's start by simulating the positions of 100 individuals 
+randomly in 2D space.
+
+```{r}
+# 100 individuals
+
+gen_rand_points <- function(n, spatial_dim) {
+  # runif is a function to generate a random number from a uniform distribution.
+  # In this case, our number can be anything between 0-10.
+  dat <- data.frame(x = runif(n, 0, spatial_dim), y = runif(n, 0, spatial_dim))
+  
+  return(dat)
+}
+
+plot_rand_points <- function(dat, spatial_dim, resoln) {
+  grid <- data.frame(x = seq(0, spatial_dim, by = resoln))
+  
+  ggplot(dat, aes(x, y)) + 
+    geom_vline(data = grid, aes(xintercept = x), col = "darkgray") +
+    geom_hline(data = grid, aes(yintercept = x), col = "darkgray") +
+    geom_vline(xintercept = c(0, spatial_dim), col = "black", linewidth = 2) +
+    geom_hline(yintercept = c(0, spatial_dim), col = "black", linewidth = 2) +
+    geom_point(col = "darkred", size = 2) + theme_minimal() +
+    theme(panel.grid = element_blank()) +
+    ylim(0, spatial_dim) + xlim(0, spatial_dim)
+    
+}
+
+count_rand_points <- function(dat, spatial_dim, resoln = 1) {
+  dat$xgrid <- floor(dat$x / resoln)
+  dat$ygrid <- floor(dat$y / resoln)
+  dat$cell <- dat$xgrid + (spatial_dim/resoln)*(dat$ygrid)
+  
+  counts <- data.frame(cell = 1:(spatial_dim/resoln)^2) %>% 
+    left_join(count(dat, cell), by = "cell") %>% 
+    mutate(n = ifelse(is.na(n), 0, n))
+  
+  return(counts)
+}
+
+
+
+# Simulate 200 individuals on a 10x10 grid
+n <- 200
+spatial_dim <- 10
+grid_resoln <- 2
+
+sim_locs <- gen_rand_points(n, spatial_dim)
+plot_rand_points(sim_locs, spatial_dim, grid_resoln)
+
+cell_counts <- count_rand_points(sim_locs, spatial_dim, grid_resoln)
+
+# Counts follow a Poisson distribution where the expected value is
+# (num. individuals) * (cell area) / (total area)
+x <- 0:(max(cell_counts$n) + 3)
+expectation <- dpois(x, n * (grid_resoln^2) / (spatial_dim^2))
+
+ggplot() +
+  geom_col(data=count(cell_counts, n), aes(n, nn)) +
+  geom_point(data = data.frame(x = x, expectation = expectation*nrow(cell_counts)),
+           aes(x, expectation), inherit.aes = FALSE, col = "red", size = 3) +
+  ggtitle("Histogram of cell counts trials compared to Poisson expectation (points)")
+```
+This relationship is approximate. Why? Where does this break down? (Think about the domain of the Poisson distribution.)
+
+### Takeaways
+
+- For a given distribution family `dist`, you can use `rdist()` to simulate random
+draws given parameters, and you can use `ddist()` to get the probability mass or
+probability density at a certain value or values given parameters.
+
+- The Poisson distribution describes a process corresponding to the random arrangement of individuals in 2D space. 
+
+
+
+
+
+
+
